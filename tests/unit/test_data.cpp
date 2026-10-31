@@ -72,8 +72,8 @@ TEST(Aurd, ZeroCopyPointer) {
     write_dataset(tmp, in, false);
     auto ds = Dataset::open(tmp);
     
-    // Uzimamo opseg od 100. do 4900. bara (dužina 4800).
-    // Pošto je kolona fizički kontinualna, ovo mora biti samo pokazivač + offset.
+    // We take the range from 100th to 4900th bar (length 4800). 
+    // Since the column is physically continuous, this must be just a pointer + offset.
     const double* s = ds.close(100, 4900);
     ASSERT_NE(s, nullptr);
     
@@ -87,15 +87,13 @@ TEST(Aurd, CorruptMagic) {
     auto in = make_bars(10);
     auto tmp = std::filesystem::temp_directory_path() / "aura_bad.aurd";
     write_dataset(tmp, in, false);
-    
-    // Namerno kvarimo prvi bajt (magic 'A' -> 'X')
+    // Intentionally corrupt the magic number in the file to test error handling.
     {
         std::fstream f(tmp, std::ios::in | std::ios::out | std::ios::binary);
         f.seekp(0); 
         f.put('X');
     }
     
-    // Očekujemo da open baci DatasetError, a ne da padne program (SIGSEGV)
     EXPECT_THROW(Dataset::open(tmp), DatasetError);
     
     std::filesystem::remove(tmp);
