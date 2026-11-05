@@ -1,0 +1,15 @@
+strategy MeanReversion {
+    param lookback : int   = 20;
+    param z_entry  : float = 2.0;
+
+    let m = sma(close, lookback);
+    let s = stdev(close, lookback);
+    let z = (close - m) / s;
+
+    enter long  when z < -z_entry;
+    exit  long  when z > 0.0;
+    enter short when z > z_entry;
+    exit  short when z < 0.0;
+
+    size = 1.0;
+}
