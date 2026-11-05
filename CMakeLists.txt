@@ -31,6 +31,7 @@ enable_testing()
 add_library(aura_data STATIC
     src/data/aurd.cpp
     src/data/csv.cpp
+    src/data/gorilla.cpp
 )
 target_include_directories(aura_data PUBLIC src)
 

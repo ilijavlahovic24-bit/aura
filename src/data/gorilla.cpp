@@ -3,46 +3,46 @@
 #include <stdexcept>
 
 namespace aura::data::aurd::gorilla {
-    class BitWriter{
-        std::vector<uint8_t> buffer;
-        size_t bit_pos= 0;
-        public:
-        void write_bit(uint32_t bit){
-            if(bit_pos % 8 ==0){
-                buffer.push_back(0);
-            }
-            if(bit){
-                buffer.back() |= (1<<(7-(bit_pos%8)));
-            }
-            ++bit_pos;
-        }
-        void write_bits(uint64_t value, int n) {
-        for (int i = n - 1; i >= 0; --i) write_bit((value >> i) & 1);
-        }
-        std::vector<uint8_t> finish() { return std::move(buffer); }
+
+class BitWriter {
+    std::vector<uint8_t> buf_;
+    size_t bit_pos_ = 0;
+public:
+    void write_bit(uint32_t bit) {
+        if (bit_pos_ % 8 == 0) buf_.push_back(0);
+        if (bit) buf_.back() |= (1 << (7 - (bit_pos_ % 8)));
+        ++bit_pos_;
     }
-    class BitReader {
-        const uint8_t* data;
-        size_t size_;
-        size_t bit_pos_ = 0;
-    public:
-        BitReader(const uint8_t* data, size_t size) : data(data), size_(size) {}
-        uint64_t read_bit() {
-            if (bit_pos_ >= size_ * 8) throw std::runtime_error("bitstream eof");
-            uint32_t bit = (data[bit_pos_ / 8] >> (7 - (bit_pos_ % 8))) & 1;
-            ++bit_pos_;
-            return bit;
-        }
-        uint64_t read_bits(int n) {
-            uint64_t v = 0;
-            for (int i = 0; i < n; ++i) v = (v << 1) | read_bit();
-            return v;
-        }
-    };
+    void write_bits(uint64_t value, int n) {
+        for (int i = n - 1; i >= 0; --i) write_bit((value >> i) & 1);
+    }
+    std::vector<uint8_t> finish() { return std::move(buf_); }
+};
+
+class BitReader {
+    const uint8_t* data_;
+    size_t size_;
+    size_t bit_pos_ = 0;
+public:
+    BitReader(const uint8_t* data, size_t size) : data_(data), size_(size) {}
+    uint64_t read_bit() {
+        if (bit_pos_ >= size_ * 8) throw std::runtime_error("bitstream eof");
+        uint32_t bit = (data_[bit_pos_ / 8] >> (7 - (bit_pos_ % 8))) & 1;
+        ++bit_pos_;
+        return bit;
+    }
+    uint64_t read_bits(int n) {
+        uint64_t v = 0;
+        for (int i = 0; i < n; ++i) v = (v << 1) | read_bit();
+        return v;
+    }
+};
+
 static int64_t sign_extend(uint64_t val, int bits) {
     uint64_t mask = 1ULL << (bits - 1);
     return static_cast<int64_t>((val ^ mask) - mask);
 }
+
 std::vector<uint8_t> compress_ts(const int64_t* ts, size_t n) {
     if (n == 0) return {};
     BitWriter bw;
@@ -182,5 +182,4 @@ void decompress_f64(const uint8_t* data, size_t size, double* out, size_t n) {
     }
 }
 
-
-}
+} // namespace aura::data::aurd::gorilla

@@ -98,3 +98,30 @@ TEST(Aurd, CorruptMagic) {
     
     std::filesystem::remove(tmp);
 }
+
+TEST(Aurd, CompressedRoundTrip) {
+    auto in = make_bars(5000);
+    auto tmp = std::filesystem::temp_directory_path() / "aura_comp.aurd";
+    write_dataset(tmp, in, true);
+    auto ds = Dataset::open(tmp);
+    
+    EXPECT_EQ(ds.size(), 5000u);
+    const double* c = ds.close(0, 5000);
+    for (size_t i = 0; i < 5000; ++i) {
+        EXPECT_DOUBLE_EQ(c[i], 100.5 + static_cast<double>(i));
+    }
+    std::filesystem::remove(tmp);
+}
+
+TEST(Aurd, CompressedConstPrices) {
+    auto in = make_bars(1000);
+    std::fill(in.close.begin(), in.close.end(), 42.0); // Konstanta
+    auto tmp = std::filesystem::temp_directory_path() / "aura_const.aurd";
+    write_dataset(tmp, in, true);
+    auto ds = Dataset::open(tmp);
+    const double* c = ds.close(0, 1000);
+    for (size_t i = 0; i < 1000; ++i) {
+        EXPECT_DOUBLE_EQ(c[i], 42.0);
+    }
+    std::filesystem::remove(tmp);
+}

@@ -8,7 +8,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
+#include"gorilla.hpp"
 namespace aura::data::aurd {
 
     inline constexpr char kMagic[4] = {'A','U','R','D'};
@@ -102,6 +102,10 @@ namespace aura::data::aurd {
         uint16_t flags_         = 0;
         std::string symbol_;
         const BlockEntry* index_ = nullptr;
+
+        // for compressed files
+        std::vector<double>  decomp_open_, decomp_high_, decomp_low_, decomp_close_, decomp_volume_;
+        std::vector<int64_t> decomp_ts_;
     };
 
 } // namespace aura::data::aurd

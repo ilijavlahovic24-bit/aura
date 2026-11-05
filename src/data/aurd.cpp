@@ -15,7 +15,57 @@ void write_dataset(const std::filesystem::path& out,
                    const RawBars& bars,
                    bool compress)
 {
-    if (compress) throw DatasetError("compression not implemented yet");
+     if (compress) {
+        const uint64_t n = bars.ts.size();
+        const uint64_t num_blocks = (n + kDefaultBlockSize - 1) / kDefaultBlockSize;
+
+        std::ofstream f(out, std::ios::binary);
+        if (!f) throw DatasetError("cannot open for writing");
+
+        Header h{};
+        std::memcpy(h.magic, kMagic, 4);
+        h.version = kVersion;
+        h.flags = kFlagCompressed;
+        h.num_bars = n;
+        h.timeframe_sec = bars.timeframe_sec;
+        h.block_size = kDefaultBlockSize;
+        h.num_blocks = num_blocks;
+        h.reserved = 0;
+        std::memcpy(h.symbol, bars.symbol.c_str(), std::min<size_t>(bars.symbol.size(), kSymbolLen - 1));
+        f.write(reinterpret_cast<const char*>(&h), sizeof(Header));
+
+        std::vector<BlockEntry> index;
+        index.reserve(num_blocks * 6);
+
+        for (uint64_t b = 0; b < num_blocks; ++b) {
+            size_t start = b * kDefaultBlockSize;
+            size_t count = std::min<uint64_t>(kDefaultBlockSize, n - start);
+            
+            for (int c = 0; c < 6; ++c) {
+                std::vector<uint8_t> comp;
+                if (c == 0) comp = gorilla::compress_ts(bars.ts.data() + start, count);
+                else if (c == 1) comp = gorilla::compress_f64(bars.open.data() + start, count);
+                else if (c == 2) comp = gorilla::compress_f64(bars.high.data() + start, count);
+                else if (c == 3) comp = gorilla::compress_f64(bars.low.data() + start, count);
+                else if (c == 4) comp = gorilla::compress_f64(bars.close.data() + start, count);
+                else if (c == 5) comp = gorilla::compress_f64(bars.volume.data() + start, count);
+
+                BlockEntry e{};
+                e.offset = static_cast<uint64_t>(f.tellp());
+                e.size = static_cast<uint32_t>(comp.size());
+                e.num_bars = static_cast<uint32_t>(count);
+                f.write(reinterpret_cast<const char*>(comp.data()), comp.size());
+                index.push_back(e);
+            }
+        }
+        
+        h.index_offset = static_cast<uint64_t>(f.tellp());
+        f.write(reinterpret_cast<const char*>(index.data()), index.size() * sizeof(BlockEntry));
+        
+        f.seekp(0);
+        f.write(reinterpret_cast<const char*>(&h), sizeof(Header));
+        return;
+    }
     if (bars.ts.size() != bars.open.size() || bars.ts.size() != bars.close.size())
         throw DatasetError("column size mismatch");
 
@@ -128,7 +178,7 @@ Dataset Dataset::open(const std::filesystem::path& path) {
     if (h->version != kVersion)                { ::munmap(addr, fsize); ::close(fd); throw DatasetError("bad version"); }
     if (h->reserved != 0)                      { ::munmap(addr, fsize); ::close(fd); throw DatasetError("reserved not zero"); }
     if (h->block_size == 0)                    { ::munmap(addr, fsize); ::close(fd); throw DatasetError("zero block size"); }
-
+    
     const uint64_t idx_bytes = h->num_blocks * 6 * sizeof(BlockEntry);
     if (h->index_offset > fsize || idx_bytes > fsize - h->index_offset) {
         ::munmap(addr, fsize); ::close(fd);
@@ -147,13 +197,47 @@ Dataset Dataset::open(const std::filesystem::path& path) {
     d.symbol_        = std::string(h->symbol, ::strnlen(h->symbol, kSymbolLen));
     d.index_         = reinterpret_cast<const BlockEntry*>(
         static_cast<const uint8_t*>(addr) + h->index_offset);
+    
+     if (d.flags_ & kFlagCompressed) {
+        d.decomp_ts_.resize(d.num_bars_);
+        d.decomp_open_.resize(d.num_bars_);
+        d.decomp_high_.resize(d.num_bars_);
+        d.decomp_low_.resize(d.num_bars_);
+        d.decomp_close_.resize(d.num_bars_);
+        d.decomp_volume_.resize(d.num_bars_);
+
+        for (uint64_t b = 0; b < d.num_blocks_; ++b) {
+            size_t start = b * d.block_size_;
+            for (int c = 0; c < 6; ++c) {
+                const BlockEntry& e = d.index_[b * 6 + c];
+                const uint8_t* ptr = static_cast<const uint8_t*>(addr) + e.offset;
+                if (c == 0) gorilla::decompress_ts(ptr, e.size, d.decomp_ts_.data() + start, e.num_bars);
+                else if (c == 1) gorilla::decompress_f64(ptr, e.size, d.decomp_open_.data() + start, e.num_bars);
+                else if (c == 2) gorilla::decompress_f64(ptr, e.size, d.decomp_high_.data() + start, e.num_bars);
+                else if (c == 3) gorilla::decompress_f64(ptr, e.size, d.decomp_low_.data() + start, e.num_bars);
+                else if (c == 4) gorilla::decompress_f64(ptr, e.size, d.decomp_close_.data() + start, e.num_bars);
+                else if (c == 5) gorilla::decompress_f64(ptr, e.size, d.decomp_volume_.data() + start, e.num_bars);
+            }
+        }
+    }
     return d;
 }
 
 const double* Dataset::ptr_double(Column c, size_t b, size_t e) const {
+    
+
     if (b > e || e > num_bars_) throw DatasetError("range out of bounds");
-    if (flags_ & kFlagCompressed) throw DatasetError("compressed not implemented");
     if (b == e || num_blocks_ == 0) return nullptr;
+    
+    if (flags_ & kFlagCompressed) {
+        if (c == Column::Open) return decomp_open_.data() + b;
+        if (c == Column::High) return decomp_high_.data() + b;
+        if (c == Column::Low) return decomp_low_.data() + b;
+        if (c == Column::Close) return decomp_close_.data() + b;
+        if (c == Column::Volume) return decomp_volume_.data() + b;
+        throw DatasetError("invalid column");
+    }
+
     
     const BlockEntry& base = index_[static_cast<size_t>(c)];
     const double* p = reinterpret_cast<const double*>(
@@ -164,13 +248,17 @@ const double* Dataset::ptr_double(Column c, size_t b, size_t e) const {
 
 const int64_t* Dataset::ptr_i64(Column c, size_t b, size_t e) const {
     if (b > e || e > num_bars_) throw DatasetError("range out of bounds");
-    if (flags_ & kFlagCompressed) throw DatasetError("compressed not implemented");
     if (b == e || num_blocks_ == 0) return nullptr;
-    
+
+    if (c != Column::Ts)
+        throw DatasetError("ptr_i64 supports only Column::Ts");
+
+    if (flags_ & kFlagCompressed)
+        return decomp_ts_.data() + b;
+
     const BlockEntry& base = index_[static_cast<size_t>(c)];
     const int64_t* p = reinterpret_cast<const int64_t*>(
         static_cast<const uint8_t*>(mmap_base_) + base.offset);
-    
     return p + b;
 }
 
