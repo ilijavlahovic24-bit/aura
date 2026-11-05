@@ -19,6 +19,25 @@ find_package(BISON  REQUIRED)
 message(STATUS "Flex  ${FLEX_VERSION}")
 message(STATUS "Bison ${BISON_VERSION}")
 
+# Flex generates lexer.cpp from lexer.l
+FLEX_TARGET(AuraLexer
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/lang/lexer.l
+    ${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp
+)
+
+add_library(aura_lang STATIC
+    src/lang/token.cpp
+    ${FLEX_AuraLexer_OUTPUTS}
+)
+target_include_directories(aura_lang
+    PUBLIC  src
+    PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+add_executable(aura_lex src/lang/lexer_main.cpp)
+target_link_libraries(aura_lex PRIVATE aura_lang)
+target_include_directories(aura_lex PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
 # --- LLVM probe ---
 find_package(LLVM 17 REQUIRED CONFIG)
 message(STATUS "LLVM  ${LLVM_PACKAGE_VERSION} @ ${LLVM_DIR}")

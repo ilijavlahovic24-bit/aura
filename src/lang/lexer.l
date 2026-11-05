@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 
+#undef YY_DECL
 #define YY_DECL aura::lang::Token aura::lang::Lexer::next()
 
 using namespace aura::lang;
@@ -102,6 +103,13 @@ static const std::unordered_map<std::string, Tok> kKeywords = {
 namespace aura::lang {
 
 Lexer::Lexer(std::istream* in) : yyFlexLexer(in) {}
+
+// <FlexLexer.h> deklarise "virtual int yylex();"
+// Posto je YY_DECL override-ovan, flex ne generise yyFlexLexer::yylex(),
+// pa ga moramo sami definisati da bi vtable bio kompletan.
+int Lexer::yylex() {
+    return 0;
+}
 
 Token Lexer::make(Tok kind) const {
     Token t;
