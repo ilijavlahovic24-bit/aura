@@ -1,4 +1,5 @@
 #include "parser.hpp"
+#include "sema.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -21,6 +22,13 @@ int main(int argc, char** argv) {
     }
 
     if (strat) {
+        aura::lang::SemanticAnalyzer sema;
+        if (!sema.analyze(*strat, argv[1])) {
+            for (const auto& e : sema.errors()) {
+                std::cerr << e << "\n";
+            }
+            return 2;
+        }
         strat->dump(std::cout);
     }
     return 0;

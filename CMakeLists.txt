@@ -36,6 +36,7 @@ BISON_TARGET(AuraParser
 add_library(aura_lang STATIC
     src/lang/token.cpp
     src/lang/ast.cpp
+    src/lang/sema.cpp 
     ${FLEX_AuraLexer_OUTPUTS}
     ${BISON_AuraParser_OUTPUTS}
 )

@@ -1,0 +1,8 @@
+strategy Bad {
+    param lookback : int = 20;
+    let m = sma(close, lookback);
+    // Error 1 : different types (bool + float)
+    let z = true + 2.0;
+    //  Error 2 no exit long
+    enter long when close > m;
+}
