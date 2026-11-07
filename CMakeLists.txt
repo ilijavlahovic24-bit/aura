@@ -35,8 +35,11 @@ BISON_TARGET(AuraParser
 # --- Language library (single definition) ---
 add_library(aura_lang STATIC
     src/lang/token.cpp
+    src/lang/type.cpp
     src/lang/ast.cpp
-    src/lang/sema.cpp 
+    src/lang/sema.cpp
+    src/lang/ir.cpp
+    src/lang/ir_builder.cpp 
     ${FLEX_AuraLexer_OUTPUTS}
     ${BISON_AuraParser_OUTPUTS}
 )
@@ -54,6 +57,9 @@ target_include_directories(aura_lex PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_executable(aura_parse src/lang/parser_main.cpp)
 target_link_libraries(aura_parse PRIVATE aura_lang)
 target_include_directories(aura_parse PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+# IR driver
+add_executable(aura_ir src/lang/ir_main.cpp)
+target_link_libraries(aura_ir PRIVATE aura_lang)
 
 # --- LLVM probe ---
 find_package(LLVM 17 REQUIRED CONFIG)
