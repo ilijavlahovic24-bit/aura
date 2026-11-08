@@ -58,7 +58,9 @@ target_include_directories(aura_lang
 # --- Codegen (LLVM IR + JIT) ---
 add_library(aura_codegen STATIC
     src/codegen/llvm_codegen.cpp
-    src/codegen/jit.cpp)
+    src/codegen/jit.cpp
+    src/codegen/interp.cpp
+    )
 target_include_directories(aura_codegen PUBLIC src ${LLVM_INCLUDE_DIRS})
 target_link_libraries(aura_codegen PUBLIC aura_lang)
 
@@ -83,8 +85,10 @@ add_executable(aura_emit  src/codegen/codegen_main.cpp)
 target_link_libraries(aura_emit PRIVATE aura_codegen)
 
 # --- aura_run: JIT + poziv kernela ---
-add_executable(aura_run src/codegen/jit_main.cpp
-src/rt/extern_c.cpp)
+add_executable(aura_run 
+src/codegen/jit_main.cpp
+src/rt/extern_c.cpp
+)
 target_link_libraries(aura_run PRIVATE aura_codegen pthread)
 # JIT mora da nađe aura_rt_* simbole u dinamičkoj tabeli
 target_link_options(aura_run PRIVATE -rdynamic)

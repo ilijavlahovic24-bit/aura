@@ -3,99 +3,124 @@
 #include "lang/ir_builder.hpp"
 #include "codegen/llvm_codegen.hpp"
 #include "codegen/jit.hpp"
+#include "codegen/interp.hpp"
 #include "codegen/context.hpp"
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <cmath>
-
-// Runtime implementacije (privremeno, dok ne pređemo na Fazu 3)
+#include <cstring>
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "usage: " << argv[0] << " file.aura\n";
+    std::string strategy_file;
+    bool use_interp = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--interp") use_interp = true;
+        else if (argv[i][0] != '-') strategy_file = argv[i];
+    }
+    if (strategy_file.empty()) {
+        std::cerr << "usage: " << argv[0] << " file.aura [--interp]\n";
         return 1;
     }
-    std::ifstream f(argv[1]);
-    if (!f) { std::cerr << "cannot open " << argv[1] << "\n"; return 1; }
 
-    // 1. Frontend
+    std::ifstream f(strategy_file);
+    if (!f) { std::cerr << "cannot open " << strategy_file << "\n"; return 1; }
+
     aura::lang::Parser parser(f);
     auto strat = parser.parse();
     if (!parser.errors().empty()) {
-        for (const auto& e : parser.errors()) std::cerr << e << "\n";
+        for (auto& e : parser.errors()) std::cerr << e << "\n";
         return 2;
     }
     aura::lang::SemanticAnalyzer sema;
-    if (!sema.analyze(*strat, argv[1])) {
-        for (const auto& e : sema.errors()) std::cerr << e << "\n";
+    if (!sema.analyze(*strat, strategy_file)) {
+        for (auto& e : sema.errors()) std::cerr << e << "\n";
         return 2;
     }
 
-    // 2. IR
-    aura::lang::IRBuilder builder;
-    auto ir = builder.build(*strat);
+    aura::lang::IRBuilder irb;
+    auto ir = irb.build(*strat);
 
-    // 3. LLVM IR
-    aura::codegen::LLVMCodegen codegen;
-    auto mod = codegen.generate(ir);
+    aura::codegen::LLVMCodegen cg;
+    auto mod = cg.generate(ir);
+    const int scratch_slots = cg.used_scratch_slots();
 
-    // 4. JIT
+    // Priprema podataka
+    const int64_t n = 1000;
+    std::vector<double> open(n), high(n), low(n), close(n), volume(n);
+    for (int64_t i = 0; i < n; ++i) {
+        double p = 100.0 + 5.0 * std::sin(i * 0.1);
+        open[i] = p - 0.1; close[i] = p;
+        high[i] = p + 0.5; low[i] = p - 0.5;
+        volume[i] = 1000.0;
+    }
+    std::vector<double> params;
+    for (const auto& p : strat->params) {
+        if (auto fe = dynamic_cast<aura::lang::FloatExpr*>(p.init.get()))
+            params.push_back(fe->value);
+        else if (auto ie = dynamic_cast<aura::lang::IntExpr*>(p.init.get()))
+            params.push_back((double)ie->value);
+        else params.push_back(0.0);
+    }
+
+    auto make_ctx = [&](std::vector<uint8_t>& el, std::vector<uint8_t>& xl,
+                        std::vector<uint8_t>& es, std::vector<uint8_t>& xs,
+                        std::vector<double>& sz, std::vector<double>& scratch) -> KernelCtx {
+        el.assign(n, 0); xl.assign(n, 0); es.assign(n, 0); xs.assign(n, 0);
+        sz.assign(n, 0.0);
+        scratch.assign((size_t)scratch_slots * n, 0.0);
+        KernelCtx ctx{};
+        ctx.open = open.data(); ctx.high = high.data();
+        ctx.low = low.data();   ctx.close = close.data();
+        ctx.volume = volume.data();
+        ctx.params = params.data();
+        ctx.enter_long = el.data();  ctx.exit_long = xl.data();
+        ctx.enter_short = es.data(); ctx.exit_short = xs.data();
+        ctx.size = sz.data();
+        ctx.scratch = scratch.data();
+        ctx.n = n; ctx.num_scratch = scratch_slots;
+        return ctx;
+    };
+
+    // --- JIT put ---
     aura::codegen::JITEngine jit;
     KernelFn kernel = jit.compile(std::move(mod));
 
-    // 5. Test podaci
-    const int64_t n = 1000;
-    std::vector<double> open(n, 100.0), high(n, 101.0), low(n, 99.0);
-    std::vector<double> close(n), volume(n, 1000.0);
+    std::vector<uint8_t> el_j, xl_j, es_j, xs_j;
+    std::vector<double> sz_j, scr_j;
+    auto ctx_j = make_ctx(el_j, xl_j, es_j, xs_j, sz_j, scr_j);
+    kernel(&ctx_j);
+
+    // --- Interp put ---
+    std::vector<uint8_t> el_i, xl_i, es_i, xs_i;
+    std::vector<double> sz_i, scr_i;
+    auto ctx_i = make_ctx(el_i, xl_i, es_i, xs_i, sz_i, scr_i);
+    aura::codegen::interpret(ir, ctx_i);
+
+    // --- Poređenje ---
+    auto count = [&](const std::vector<uint8_t>& v) {
+        int c = 0; for (auto b : v) if (b) ++c; return c;
+    };
+    std::cout << "=== JIT ===\n";
+    std::cout << "enter_long: " << count(el_j) << ", exit_long: " << count(xl_j) << "\n";
+    std::cout << "enter_short: " << count(es_j) << ", exit_short: " << count(xs_j) << "\n";
+    std::cout << "=== INTERP ===\n";
+    std::cout << "enter_long: " << count(el_i) << ", exit_long: " << count(xl_i) << "\n";
+    std::cout << "enter_short: " << count(es_i) << ", exit_short: " << count(xs_i) << "\n";
+
+    // Diff provera
+    int diffs = 0;
     for (int64_t i = 0; i < n; ++i) {
-        close[i] = 100.0 + std::sin(i * 0.1) * 5.0;
+        if (el_j[i] != el_i[i]) ++diffs;
+        if (xl_j[i] != xl_i[i]) ++diffs;
+        if (es_j[i] != es_i[i]) ++diffs;
+        if (xs_j[i] != xs_i[i]) ++diffs;
     }
+    std::cout << "=== DIFF ===\n";
+    std::cout << "signal mismatches: " << diffs << "\n";
 
-    std::vector<uint8_t> enter_long(n, 0), exit_long(n, 0);
-    std::vector<uint8_t> enter_short(n, 0), exit_short(n, 0);
-    std::vector<double> size_out(n, 0.0);
-
-    // Povećano na 64 da pokrije sve privremene serije (za mean_reversion treba 13)
-    const int64_t num_scratch = 64;
-    std::vector<double> scratch(num_scratch * n, 0.0);
-
-    std::vector<double> params = {20.0, 2.0};
-
-    // 6. KernelCtx
-    KernelCtx ctx;
-    ctx.open = open.data();
-    ctx.high = high.data();
-    ctx.low = low.data();
-    ctx.close = close.data();
-    ctx.volume = volume.data();
-    ctx.params = params.data();
-    ctx.enter_long = enter_long.data();
-    ctx.exit_long = exit_long.data();
-    ctx.enter_short = enter_short.data();
-    ctx.exit_short = exit_short.data();
-    ctx.size = size_out.data();
-    ctx.scratch = scratch.data();
-    ctx.n = n;
-    ctx.num_scratch = num_scratch;
-
-    // 7. Poziv
-    kernel(&ctx);
-
-    // 8. Validacija
-    int enters = 0, exits = 0;
-    for (int64_t i = 0; i < n; ++i) {
-        if (enter_long[i]) ++enters;
-        if (exit_long[i]) ++exits;
+    if (use_interp) {
+        std::cout << "(Ran interpreter only via --interp; comparison shown above)\n";
     }
-    std::cout << "Kernel executed. enter_long signals: " << enters
-              << ", exit_long signals: " << exits << "\n";
-
-    bool size_set = false;
-    for (int64_t i = 0; i < n; ++i) {
-        if (size_out[i] != 0.0) { size_set = true; break; }
-    }
-    std::cout << "Size set: " << (size_set ? "yes" : "no") << "\n";
-
-    return 0;
+    return diffs == 0 ? 0 : 1;
 }
