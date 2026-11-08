@@ -65,6 +65,28 @@ target_link_libraries(aura_ir PRIVATE aura_lang)
 find_package(LLVM 17 REQUIRED CONFIG)
 message(STATUS "LLVM  ${LLVM_PACKAGE_VERSION} @ ${LLVM_DIR}")
 
+
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+add_definitions(${LLVM_DEFINITIONS_LIST})
+# codegen library
+add_library(aura_codegen STATIC
+    src/codegen/llvm_codegen.cpp
+)
+
+target_include_directories(aura_codegen PUBLIC src ${LLVM_INCLUDE_DIRS})
+target_link_libraries(aura_codegen PUBLIC aura_lang)
+
+# dding an executable
+add_executable(aura_emit src/codegen/codegen_main.cpp)
+target_link_libraries(aura_emit PRIVATE aura_codegen)
+
+# Linking the LLVM components we need
+llvm_map_components_to_libnames(LLVM_LIBS core irreader support)
+target_link_libraries(aura_codegen PUBLIC ${LLVM_LIBS})
+
+
+
 # --- Testing setup ---
 find_package(GTest REQUIRED)
 enable_testing()
