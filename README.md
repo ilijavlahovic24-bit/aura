@@ -6,7 +6,7 @@ Aura lets you describe a trading strategy in a small statically-typed DSL, compi
 code through LLVM at runtime, and evaluates it over hundreds of millions of bars using
 vectorized (AVX2) kernels and a deterministic portfolio simulator.
 
-# Status: In Progress
+# Status: Maintained
 ---
 
 ## Why Aura
@@ -203,10 +203,10 @@ aura serve    [--port 8080] --data <data.aurd>
 
 ## Roadmap
 
-- [ ] **Phase 1: Data engine.** `.aurd`, `mmap`, CSV import, Gorilla compression
-- [ ] **Phase 2: Language and JIT.** Flex/Bison frontend, semantic analysis, LLVM IR, ORC JIT, reference interpreter
-- [ ] **Phase 3: Vectorized execution.** AVX2 kernels, simulator, metrics, parallel sweep
-- [ ] **Phase 4: Tooling.** CLI, JSON schema, HTTP API, dashboard
+- [ + ] **Phase 1: Data engine.** `.aurd`, `mmap`, CSV import, Gorilla compression
+- [ + ] **Phase 2: Language and JIT.** Flex/Bison frontend, semantic analysis, LLVM IR, ORC JIT, reference interpreter
+- [ + ] **Phase 3: Vectorized execution.** AVX2 kernels, simulator, metrics, parallel sweep
+- [ + ] **Phase 4: Tooling.** CLI, JSON schema, HTTP API, dashboard
 - [ ] Stretch: multi-instrument portfolios, parser fuzzing, AVX-512 path, walk-forward analysis
 
 ---
