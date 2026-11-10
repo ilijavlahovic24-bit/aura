@@ -25,7 +25,7 @@ include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
 add_definitions(${LLVM_DEFINITIONS_LIST})
 
-# --- Generisani fajlovi ---
+# --- Generated files ---
 FLEX_TARGET(AuraLexer
     ${CMAKE_CURRENT_SOURCE_DIR}/src/lang/lexer.l
     ${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp)
@@ -34,7 +34,7 @@ BISON_TARGET(AuraParser
     ${CMAKE_CURRENT_BINARY_DIR}/aura_parser.cpp
     DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/aura_parser.hpp)
 
-# --- Data ---
+# --- Data engine ---
 add_library(aura_data STATIC
     src/data/aurd.cpp
     src/data/csv.cpp
@@ -55,21 +55,32 @@ target_include_directories(aura_lang
     PUBLIC  src
     PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-# --- Codegen (LLVM IR + JIT) ---
+# --- Runtime (AVX2 kernels) ---
+add_library(aura_rt STATIC
+    src/rt/kernels.cpp
+    src/rt/extern_c.cpp)
+target_include_directories(aura_rt PUBLIC src)
+target_compile_options(aura_rt PRIVATE -mavx2)
+
+# --- Simulator ---
+add_library(aura_sim STATIC
+    src/sim/simulator.cpp)
+target_include_directories(aura_sim PUBLIC src)
+
+# --- Codegen (LLVM IR + JIT + Interp) ---
 add_library(aura_codegen STATIC
     src/codegen/llvm_codegen.cpp
     src/codegen/jit.cpp
-    src/codegen/interp.cpp
-    )
+    src/codegen/interp.cpp)
 target_include_directories(aura_codegen PUBLIC src ${LLVM_INCLUDE_DIRS})
-target_link_libraries(aura_codegen PUBLIC aura_lang)
+target_link_libraries(aura_codegen PUBLIC aura_lang aura_rt)
 
-# LLVM JIT komponente
+# LLVM JIT components
 llvm_map_components_to_libnames(LLVM_LIBS
     core irreader support orcjit executionengine native nativecodegen)
 target_link_libraries(aura_codegen PUBLIC ${LLVM_LIBS})
 
-# --- Test alati ---
+# --- Tests ---
 add_executable(aura_lex   src/lang/lexer_main.cpp)
 target_link_libraries(aura_lex PRIVATE aura_lang)
 target_include_directories(aura_lex PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -84,16 +95,28 @@ target_link_libraries(aura_ir PRIVATE aura_lang)
 add_executable(aura_emit  src/codegen/codegen_main.cpp)
 target_link_libraries(aura_emit PRIVATE aura_codegen)
 
-# --- aura_run: JIT + poziv kernela ---
-add_executable(aura_run 
-src/codegen/jit_main.cpp
-src/rt/extern_c.cpp
-)
-target_link_libraries(aura_run PRIVATE aura_codegen pthread)
-# JIT mora da nađe aura_rt_* simbole u dinamičkoj tabeli
-target_link_options(aura_run PRIVATE -rdynamic)
+# --- aura_run: JIT + Interp + Simulator ---
+add_executable(aura_run src/codegen/jit_main.cpp)
+target_link_libraries(aura_run PRIVATE
+    aura_codegen
+    aura_sim
+    aura_rt
+    aura_data
+    pthread)
 
-# --- Testovi ---
+# The JIT must find the aura_rt_* symbols in the dynamic table
+target_link_options(aura_run PRIVATE -rdynamic)
+# Include ALL objects from libaura_rt.a (so that the linker doesn't throw out the ones that the JIT looks for at runtime)
+target_link_options(aura_run PRIVATE
+    "-Wl,--whole-archive"
+    "$<TARGET_FILE:aura_rt>"
+    "-Wl,--no-whole-archive")
+
+# --- CLI ---
+add_executable(aura_cli src/cli/main.cpp)
+target_link_libraries(aura_cli PRIVATE aura_data)
+
+# --- Tests ---
 enable_testing()
 add_executable(aura_tests
     tests/unit/test_data.cpp

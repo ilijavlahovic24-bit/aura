@@ -34,6 +34,7 @@ extern "C" {
     void aura_rt_broadcast_u8(uint8_t, uint8_t*, int64_t);
     void aura_rt_copy_u8(const uint8_t*, uint8_t*, int64_t);
     void aura_rt_copy_f64(const double*, double*, int64_t);
+    void aura_rt_mod(const double*, const double*, double*, int64_t);
 }
 
 namespace aura::codegen {
@@ -138,7 +139,8 @@ void interpret(const lang::IRModule& ir, KernelCtx& ctx) {
             }
 
             case lang::IROp::Add: case lang::IROp::Sub:
-            case lang::IROp::Mul: case lang::IROp::Div: {
+            case lang::IROp::Mul: case lang::IROp::Div:
+            case lang::IROp::Mod: {                                          // <-- DODATO
                 if (inst.type == lang::Type::SeriesFloat) {
                     double* lhs = ensure_f64(inst.args[0]);
                     double* rhs = ensure_f64(inst.args[1]);
@@ -148,6 +150,7 @@ void interpret(const lang::IRModule& ir, KernelCtx& ctx) {
                         case lang::IROp::Sub: aura_rt_sub(lhs, rhs, out, n); break;
                         case lang::IROp::Mul: aura_rt_mul(lhs, rhs, out, n); break;
                         case lang::IROp::Div: aura_rt_div(lhs, rhs, out, n); break;
+                        case lang::IROp::Mod: aura_rt_mod(lhs, rhs, out, n); break;   // <-- DODATO
                         default: break;
                     }
                     regs[inst.dst] = {Val::SeriesF64}; regs[inst.dst].sf64 = out;
@@ -160,6 +163,7 @@ void interpret(const lang::IRModule& ir, KernelCtx& ctx) {
                         case lang::IROp::Sub: v = l - r; break;
                         case lang::IROp::Mul: v = l * r; break;
                         case lang::IROp::Div: v = l / r; break;
+                        case lang::IROp::Mod: v = std::fmod(l, r); break;             // <-- DODATO
                         default: break;
                     }
                     regs[inst.dst] = {Val::F64}; regs[inst.dst].f = v;
@@ -280,6 +284,7 @@ void interpret(const lang::IRModule& ir, KernelCtx& ctx) {
                 aura_rt_copy_f64(src, ctx.size, n);
                 break;
             }
+            
         }
     }
 }
