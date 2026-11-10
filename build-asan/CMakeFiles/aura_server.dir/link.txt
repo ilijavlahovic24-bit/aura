@@ -1,2 +1,0 @@
-/usr/bin/ar qc libaura_server.a CMakeFiles/aura_server.dir/src/server/http_server.cpp.o
-/usr/bin/ranlib libaura_server.a

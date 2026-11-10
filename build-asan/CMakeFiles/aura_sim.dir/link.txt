@@ -1,2 +1,0 @@
-/usr/bin/ar qc libaura_sim.a CMakeFiles/aura_sim.dir/src/sim/simulator.cpp.o
-/usr/bin/ranlib libaura_sim.a

@@ -1,2 +1,0 @@
-/usr/bin/ar qc libaura_codegen.a CMakeFiles/aura_codegen.dir/src/codegen/llvm_codegen.cpp.o CMakeFiles/aura_codegen.dir/src/codegen/jit.cpp.o CMakeFiles/aura_codegen.dir/src/codegen/interp.cpp.o
-/usr/bin/ranlib libaura_codegen.a

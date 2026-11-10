@@ -1,1 +1,0 @@
-/usr/bin/c++ -fsanitize=address,undefined CMakeFiles/aura_ir.dir/src/lang/ir_main.cpp.o -o aura_ir  libaura_lang.a 
