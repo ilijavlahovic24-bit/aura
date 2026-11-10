@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=address,undefined CMakeFiles/aura_parse.dir/src/lang/parser_main.cpp.o -o aura_parse  libaura_lang.a 

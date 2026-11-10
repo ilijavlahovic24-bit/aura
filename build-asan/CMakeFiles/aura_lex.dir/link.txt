@@ -1,0 +1,1 @@
+/usr/bin/c++ -fsanitize=address,undefined CMakeFiles/aura_lex.dir/src/lang/lexer_main.cpp.o -o aura_lex  libaura_lang.a 

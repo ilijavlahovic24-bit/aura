@@ -1,0 +1,2 @@
+/usr/bin/ar qc libaura_data.a CMakeFiles/aura_data.dir/src/data/aurd.cpp.o CMakeFiles/aura_data.dir/src/data/csv.cpp.o CMakeFiles/aura_data.dir/src/data/gorilla.cpp.o
+/usr/bin/ranlib libaura_data.a

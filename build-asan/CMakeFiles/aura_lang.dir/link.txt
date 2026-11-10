@@ -1,0 +1,2 @@
+/usr/bin/ar qc libaura_lang.a CMakeFiles/aura_lang.dir/src/lang/token.cpp.o CMakeFiles/aura_lang.dir/src/lang/type.cpp.o CMakeFiles/aura_lang.dir/src/lang/ast.cpp.o CMakeFiles/aura_lang.dir/src/lang/sema.cpp.o CMakeFiles/aura_lang.dir/src/lang/ir.cpp.o CMakeFiles/aura_lang.dir/src/lang/ir_builder.cpp.o CMakeFiles/aura_lang.dir/lexer.cpp.o CMakeFiles/aura_lang.dir/aura_parser.cpp.o
+/usr/bin/ranlib libaura_lang.a

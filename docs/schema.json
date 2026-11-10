@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Aura Backtest Result",
+  "type": "object",
+  "required": ["strategy", "params", "config", "metrics", "trades", "equity"],
+  "properties": {
+    "strategy": { "type": "string" },
+    "params": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "capital":      { "type": "number" },
+        "fee_bps":      { "type": "number" },
+        "slippage_bps": { "type": "number" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "total_return":  { "type": "number" },
+        "cagr":          { "type": "number" },
+        "sharpe":        { "type": "number" },
+        "sortino":       { "type": "number" },
+        "max_drawdown":  { "type": "number" },
+        "calmar":        { "type": "number" },
+        "trade_count":   { "type": "integer" },
+        "win_rate":      { "type": "number" },
+        "profit_factor": { "type": "number" },
+        "exposure":      { "type": "number" }
+      }
+    },
+    "trades": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["entry", "exit", "pnl", "long"],
+        "properties": {
+          "entry": { "type": "integer" },
+          "exit":  { "type": "integer" },
+          "entry_price": { "type": "number" },
+          "exit_price":  { "type": "number" },
+          "size":  { "type": "number" },
+          "long":  { "type": "boolean" },
+          "pnl":   { "type": "number" }
+        }
+      }
+    },
+    "equity": {
+      "type": "array",
+      "items": { "type": "number" }
+    }
+  }
+}

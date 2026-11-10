@@ -1,0 +1,2 @@
+/usr/bin/ar qc libaura_rt.a CMakeFiles/aura_rt.dir/src/rt/kernels.cpp.o CMakeFiles/aura_rt.dir/src/rt/extern_c.cpp.o
+/usr/bin/ranlib libaura_rt.a

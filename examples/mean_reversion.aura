@@ -11,5 +11,5 @@ strategy MeanReversion {
     enter short when z > z_entry;
     exit  short when z < 0.0;
 
-    size = 1.0;
+    size = 0.1;
 }
